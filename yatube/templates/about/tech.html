@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Технологии{% endblock %}
+{% block content %}
+  <div class="row">
+    <h1>Используемые технологии</h1>
+    <aside class="col-12 col-md-3">
+      <ul class="list-group list-group-flush">
+        <li class="list-group-item">
+          Python
+        </li>
+        <li class="list-group-item">
+          Django
+        </li>
+      </ul>
+    </aside>
+    <article class="col-12 col-md-9">
+      <p class="authorParagraph">
+        Данное веб-приложение создано с помощью фреймворка
+        <a href="https://www.djangoproject.com/">Django 2.2.9</a>,
+        написанного на языке программирования 
+        <a href="https://www.python.org/">Python</a>.
+        Для оформления использовался 
+        <a 
+        href="https://getbootstrap.com/docs/5.0/getting-started/introduction/"
+        >
+          Bootstrap</a> - популярный инструмент для создания адаптивного 
+          дизайна сайтов.
+        </p>
+        <h5>На данный момент уже реализовано:</h5>
+        <ul id="features">
+          <li>Возможность регистрации и авторизации пользователя</li>
+          <li>Создание и редактирование публикаций</li>
+          <li>Просмотр публикаций в зависимости от группы поста</li>
+          <li>Просмотр детальной информации о публикации</li>  
+        </ul>
+      <p class="authorParagraph">
+        В дальнейшем функциональность веб-приложения будет расширена (я надеюсь),
+        будут добавлена возможность подписки на авторов и др.
+      </p>
+      <a href="{% url 'posts:index' %}"/>
+        <button type="button" class="btn btn-primary float-end">
+          Перейти на главную страницу
+        </button>
+      </a>
+    </article>
+  </div>
+{% endblock %} 

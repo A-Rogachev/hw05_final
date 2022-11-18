@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Об авторе проекта{% endblock %}
+{% block content %}
+  <h1>Привет, я автор</h1>
+  <p class="authorParagraph">
+    Меня зовут Александр Рогачев, я студент 50 когорты Яндекс-Практикум
+     по направлению "Бэкенд-Разработчик". Мое знакомство с языком Python 
+    произошло осенью 2020 г, когда я установил python 3.8.4 и PyCharm на
+     свой ноутбук. Данный ЯП здорово помогает мне в повседневной работе 
+    (автоматизация каких-то опр. процессов и тп).
+  </p>
+  <div class="container d-flex justify-content-center">
+    <img src="{% static 'img/mug.jpg' %}" 
+    id="coffeeMug" 
+    width="962" height="482"
+    alt="Кружка для кофе" 
+    title="Кружка для кофе"
+    >
+  </div>
+{% endblock %} 

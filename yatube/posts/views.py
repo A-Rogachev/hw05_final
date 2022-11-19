@@ -177,7 +177,6 @@ def follow_index(request):
 
     context: Dict[str, Union[str, Any]] = {
         'page_obj': page_obj,
-        'title': 'Избранные авторы',
         'index': True,
         'follow': True,
     }

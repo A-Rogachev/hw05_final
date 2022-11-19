@@ -134,6 +134,16 @@ class Follow(models.Model):
     class Meta:
         verbose_name = 'Подписка'
         verbose_name_plural = 'Подписки'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'author'],
+                name='unique follow'
+            ),
+            models.CheckConstraint(
+                name="prevent_self_follow",
+                check=~models.Q(user=models.F("author")),
+            ),
+        ]
 
     def __str__(self) -> str:
         """Строковое представление подписки"""

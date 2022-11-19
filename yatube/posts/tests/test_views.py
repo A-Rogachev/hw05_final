@@ -1,3 +1,4 @@
+import enum
 import math
 import shutil
 import tempfile
@@ -24,6 +25,7 @@ class PostsViewsTest(TestCase):
         super().setUpClass()
 
         cls.user_author = User.objects.create_user(username='TheAuthor')
+        cls.user_follower = User.objects.create_user(username='TheFollower')
 
         cls.test_group = Group.objects.create(
             title='Group1',
@@ -69,11 +71,21 @@ class PostsViewsTest(TestCase):
         shutil.rmtree(TEMP_MEDIA_ROOT, ignore_errors=True)
 
     def setUp(self):
-        self.authorized_client = Client()
-        self.authorized_client.force_login(self.user_author)
+        self.auth_client = Client()
+        self.auth_client.force_login(self.user_author)
         cache.clear()
 
     def test_page_shows_correct_context(self):
+        """
+        Проверяем корректный контекст на страницах приложения.
+        """
+        Follow.objects.create(
+            user=self.user_follower,
+            author=self.user_author,
+        )
+
+        self.auth_client.force_login(self.user_follower)
+
         urls_for_context_testing = [
             reverse(
                 'posts:index',
@@ -86,11 +98,14 @@ class PostsViewsTest(TestCase):
                 'posts:profile',
                 kwargs={'username': self.user_author.username},
             ),
+            reverse(
+                'posts:follow_index',
+            ),
         ]
 
         for url in urls_for_context_testing:
             with self.subTest(url=url):
-                response = self.authorized_client.get(url)
+                response = self.auth_client.get(url)
                 testing_post = response.context['page_obj'].object_list[0]
                 for field in self.post._meta.get_fields():
                     with self.subTest(field=field):
@@ -100,6 +115,15 @@ class PostsViewsTest(TestCase):
                             'Ошибка контекста'
                             f' при формировании страницы по адресу {url}.'
                         )
+
+    def test_not_follower_context(self):
+        """Проверяем верный контекст у _не_подписчика"""
+        response = self.auth_client.get(reverse('posts:follow_index'))
+        self.assertNotIn(
+            self.post,
+            response.context['page_obj'].object_list,
+            'Пост попал в неверную подписку.'
+        )
 
     def test_right_context_for_group_profile_pages(self):
         """
@@ -127,7 +151,7 @@ class PostsViewsTest(TestCase):
 
         for url, model_obj, name in urls_context_list:
             with self.subTest(url=url):
-                response = self.authorized_client.get(url)
+                response = self.auth_client.get(url)
                 self.assertEquals(
                     response.context[0][name],
                     model_obj,
@@ -141,7 +165,7 @@ class PostsViewsTest(TestCase):
         Проверяем, что созданный пост не попадает в
         неверную группу.
         """
-        response = self.authorized_client.get(
+        response = self.auth_client.get(
             reverse(
                 'posts:group_posts',
                 kwargs={'slug': self.test_group_for_post_create_testing.slug},
@@ -157,7 +181,7 @@ class PostsViewsTest(TestCase):
         """
         Шаблон post_detail.html сформирован с правильным контекстом.
         """
-        response = self.authorized_client.get(
+        response = self.auth_client.get(
             reverse(
                 'posts:post_detail',
                 kwargs={'post_id': self.post.pk}
@@ -184,7 +208,7 @@ class PostsViewsTest(TestCase):
 
     def test_create_page_show_correct_context(self):
         """Шаблон create.html сформирован с правильным контекстом"""
-        response = self.authorized_client.get(reverse('posts:post_create'))
+        response = self.auth_client.get(reverse('posts:post_create'))
         self.assertIsInstance(
             response.context['form'],
             PostForm,
@@ -195,7 +219,7 @@ class PostsViewsTest(TestCase):
         """
         Форма редактирования поста, отфильтрованного по id.
         """
-        response = self.authorized_client.get(
+        response = self.auth_client.get(
             reverse(
                 'posts:post_edit', kwargs={
                     'post_id': self.post.pk,
@@ -221,8 +245,13 @@ class PostsViewsTest(TestCase):
         """
         text_of_test_post = self.post.text
 
-        for stage in range(3):
-            content = self.authorized_client.get(
+        CheckLevels = enum.Enum(
+            'CheckLevels',
+            'before_removing_obj after_removing_obj after_cache_clear',
+        )
+
+        for level in CheckLevels:
+            content = self.auth_client.get(
                 reverse('posts:index')
             ).content
 
@@ -232,10 +261,16 @@ class PostsViewsTest(TestCase):
                 'Ошибка в кешировании страницы.',
             )
 
-            self.assertIn(*args) if stage != 2 else self.assertNotIn(*args)
+            if level == 'after_cache_clear':
+                self.assertNotIn(*args)
+            else:
+                self.assertIn(*args)
 
-            stage == 0 and Post.objects.filter(pk=self.post.pk).delete()
-            stage == 1 and cache.clear()
+            level == 'before_removing_obj' and Post.objects.filter(
+                pk=self.post.pk
+            ).delete()
+
+            level == 'after_removing_obj' and cache.clear()
 
 
 class FollowingTest(TestCase):
@@ -245,7 +280,6 @@ class FollowingTest(TestCase):
 
         cls.author = User.objects.create_user(username='Author')
         cls.follower = User.objects.create_user(username='Follower')
-        cls.not_follower = User.objects.create_user(username='NotFollower')
 
         cls.group = Group.objects.create(
             title='ТестоваяГруппа',
@@ -254,51 +288,60 @@ class FollowingTest(TestCase):
         )
 
     def setUp(self):
-        self.client_author = Client()
-        self.client_follower = Client()
-        self.client_not_follower = Client()
-
-        self.client_author.force_login(self.author)
-        self.client_follower.force_login(self.follower)
-        self.client_not_follower.force_login(self.not_follower)
+        self.client = Client()
+        self.client.force_login(self.follower)
 
     def test_ability_following_authors(self):
         """
         Авторизованный пользователь может подписываться на других
-        пользователей и удалять их из подписок.
+        пользователей.
         """
-        follows_count = Follow.objects.count()
+        self.assertFalse(
+            Follow.objects.filter(
+                author=self.author.pk,
+                user=self.follower.pk,
+            ).exists(),
+            'Подписка на автора уже существует'
+        )
 
-        self.client_follower.get(
+        self.client.get(
             reverse(
                 'posts:profile_follow',
                 kwargs={'username': self.author.username},
             )
         )
-        self.assertEqual(
-            Follow.objects.count(),
-            follows_count + 1,
-            'Не создается подписка на автора',
+
+        self.assertTrue(
+            Follow.objects.filter(
+                author=self.author.pk,
+                user=self.follower.pk,
+            ).exists(),
+            'Не создается подписка на автора'
         )
 
-        new_post = Post.objects.create(
-            text='Новый пост от автора',
+    def test_ability_unfollowing_authors(self):
+        """
+        Авторизованный пользователь может удалять из подписок
+        других пользователей.
+        """
+        Follow.objects.create(
             author=self.author,
-            group=self.group,
+            user=self.follower,
         )
 
-        response = self.client_follower.get(reverse('posts:follow_index'))
-        self.assertIn(
-            new_post,
-            response.context['page_obj'].object_list,
-            'Новый пост от автора не попал в подписку.'
+        self.client.get(
+            reverse(
+                'posts:profile_unfollow',
+                kwargs={'username': self.author.username},
+            )
         )
 
-        response = self.client_not_follower.get(reverse('posts:follow_index'))
-        self.assertNotIn(
-            new_post,
-            response.context['page_obj'].object_list,
-            'Новый пост от автора попал в неверную подписку.'
+        self.assertFalse(
+            Follow.objects.filter(
+                author=self.author.pk,
+                user=self.follower.pk,
+            ).exists(),
+            'Не удаляется подписка на автора'
         )
 
 
@@ -330,8 +373,8 @@ class PaginatorTest(TestCase):
         )
 
     def setUp(self):
-        self.authorized_client = Client()
-        self.authorized_client.force_login(self.user_author)
+        self.auth_client = Client()
+        self.auth_client.force_login(self.user_author)
 
     def test_paginator_works_properly(self):
         """
@@ -347,7 +390,7 @@ class PaginatorTest(TestCase):
 
         for address, kwargs in addresses_with_kwargs.items():
             with self.subTest(address=address):
-                response = self.authorized_client.get(
+                response = self.auth_client.get(
                     reverse(
                         address,
                         kwargs=kwargs,

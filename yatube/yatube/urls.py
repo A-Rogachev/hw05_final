@@ -18,7 +18,7 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 
-handler403 = 'core.views.forbidden'
+handler403 = 'core.views.csrf_failure'
 handler404 = 'core.views.page_not_found'
 handler500 = 'core.views.server_error'
 

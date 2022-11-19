@@ -4,6 +4,8 @@
   Последние обновления на сайте
 {% endblock %}
 
+{% load cache %}
+{% cache 20 index_page %}
 {% block content %}
   {% include 'posts/includes/switcher.html' %}
   <h1>{{ title }}</h1>
@@ -16,3 +18,4 @@
   {% include 'posts/includes/paginator.html' %}
 
 {% endblock %}
+{% endcache %}

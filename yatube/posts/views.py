@@ -6,7 +6,6 @@ from django.core.paginator import Page, Paginator
 from django.db.models import QuerySet
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.views.decorators.cache import cache_page
 
 from .forms import CommentForm, PostForm
 from .models import Follow, Group, Post, User
@@ -18,7 +17,6 @@ def get_page_obj(post_list: QuerySet, page_number: Optional[str]) -> Page:
     return paginator.get_page(page_number)
 
 
-@cache_page(20, key_prefix='index_page')
 def index(request: HttpRequest) -> HttpResponse:
     """Обработчик для главной страницы приложения"""
     post_list: QuerySet = Post.objects.select_related(
@@ -32,7 +30,6 @@ def index(request: HttpRequest) -> HttpResponse:
 
     context: Dict[str, Union[str, Any]] = {
         'page_obj': page_obj,
-        'title': 'Последние обновления на сайте',
         'index': True,
     }
     return render(request, 'posts/index.html', context)
@@ -70,12 +67,10 @@ def profile(request: HttpRequest, username: str) -> HttpResponse:
         request.GET.get('page'),
     )
 
-    if request.user.is_authenticated:
-        following: bool = Follow.objects.filter(
-            user=request.user, author=author
-        ).exists()
-    else:
-        following: bool = False
+    following: bool = (
+        request.user.is_authenticated
+        and request.user.follower.filter(author=author).exists()
+    )
 
     context: Dict[str, Any] = {
         'author': author,
@@ -160,15 +155,11 @@ def add_comment(request: HttpRequest, post_id: int) -> HttpResponse:
 
 @login_required
 def follow_index(request):
-
-    authors: list[Optional[User]] = [
-        follow.author for follow in request.user.follower.all()
-    ]
-
+    """Возвращает страницу с подписками пользователя."""
     post_list: QuerySet = Post.objects.select_related(
         'author',
         'group',
-    ).filter(author__in=authors)
+    ).filter(author__following__user=request.user.pk)
 
     page_obj: Page = get_page_obj(
         post_list,

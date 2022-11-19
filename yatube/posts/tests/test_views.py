@@ -181,6 +181,11 @@ class PostsViewsTest(TestCase):
         """
         Шаблон post_detail.html сформирован с правильным контекстом.
         """
+        context_object_list = [
+            ('post', self.post),
+            ('comments', self.comment),
+        ]
+
         response = self.auth_client.get(
             reverse(
                 'posts:post_detail',
@@ -188,23 +193,23 @@ class PostsViewsTest(TestCase):
             )
         )
 
-        for field in self.post._meta.get_fields():
-            with self.subTest(field=field):
-                self.assertEqual(
-                    getattr(response.context['post'], field.name, None),
-                    getattr(self.post, field.name, None),
-                    'Ошибка контекста в шаблоне post_detail.html'
-                    f' (поле {field}).'
-                )
-
-        for field in self.comment._meta.get_fields():
-            with self.subTest(field=field):
-                self.assertEqual(
-                    getattr(response.context['comments'][0], field.name, None),
-                    getattr(self.comment, field.name, None),
-                    'Ошибка контекста в шаблоне post_detail.html'
-                    f' (поле {field}).'
-                )
+        for name, model_obj in context_object_list:
+            for field in model_obj._meta.get_fields():
+                with self.subTest(field=field):
+                    self.assertEqual(
+                        getattr(
+                            (
+                                name == 'post'
+                                and response.context[name]
+                                or response.context[name][0]
+                            ),
+                            field.name,
+                            None
+                        ),
+                        getattr(model_obj, field.name, None),
+                        'Ошибка контекста в шаблоне post_detail.html'
+                        f' (поле {field}).'
+                    )
 
     def test_create_page_show_correct_context(self):
         """Шаблон create.html сформирован с правильным контекстом"""
@@ -243,7 +248,7 @@ class PostsViewsTest(TestCase):
         """
         Список постов на главной странице сохраняется в кэше.
         """
-        text_of_test_post = self.post.text
+        old_content = self.auth_client.get(reverse('posts:index')).content
 
         CheckLevels = enum.Enum(
             'CheckLevels',
@@ -251,13 +256,13 @@ class PostsViewsTest(TestCase):
         )
 
         for level in CheckLevels:
-            content = self.auth_client.get(
+            new_content = self.auth_client.get(
                 reverse('posts:index')
             ).content
 
             args = (
-                text_of_test_post,
-                content.decode(),
+                old_content,
+                new_content,
                 'Ошибка в кешировании страницы.',
             )
 

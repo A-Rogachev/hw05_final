@@ -1,21 +1,27 @@
 {% extends 'base.html' %}
+{% load cache %}
 
 {% block title %}
   Последние обновления на сайте
 {% endblock %}
 
-{% load cache %}
-{% cache 20 index_page %}
+
 {% block content %}
   {% include 'posts/includes/switcher.html' %}
-  <h1>{{ title }}</h1>
 
-    {% for post in page_obj %}
-      {% include 'includes/article.html' with group_link=True %}
-      {% if not forloop.last %}<hr>{% endif %}
-    {% endfor %}
-  
+  <h1>
+    {% block heading %}
+      Последние обновления на сайте
+    {% endblock %}
+  </h1>
+
+    {% cache 20 index_page page_obj %}
+      {% for post in page_obj %}
+        {% include 'includes/article.html' with group_link=True %}
+        {% if not forloop.last %}<hr>{% endif %}
+      {% endfor %}
+    {% endcache %}
+
   {% include 'posts/includes/paginator.html' %}
 
 {% endblock %}
-{% endcache %}

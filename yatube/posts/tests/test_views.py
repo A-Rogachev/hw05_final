@@ -1,7 +1,7 @@
-import enum
 import math
 import shutil
 import tempfile
+from enum import Enum
 from random import randrange
 
 from django.conf import settings
@@ -248,14 +248,14 @@ class PostsViewsTest(TestCase):
         """
         Список постов на главной странице сохраняется в кэше.
         """
+        class TestLevels(Enum):
+            BEFORE_DEL_OBJ = 1
+            AFTER_DEL_OBJ = 2
+            AFTER_CACHE_CLEAR = 3
+
         old_content = self.auth_client.get(reverse('posts:index')).content
 
-        CheckLevels = enum.Enum(
-            'CheckLevels',
-            'before_removing_obj after_removing_obj after_cache_clear',
-        )
-
-        for level in CheckLevels:
+        for level in TestLevels:
             new_content = self.auth_client.get(
                 reverse('posts:index')
             ).content
@@ -266,16 +266,16 @@ class PostsViewsTest(TestCase):
                 'Ошибка в кешировании страницы.',
             )
 
-            if level == 'after_cache_clear':
-                self.assertNotIn(*args)
+            if level is TestLevels.AFTER_CACHE_CLEAR:
+                self.assertNotEqual(*args)
             else:
-                self.assertIn(*args)
+                self.assertEqual(*args)
 
-            level == 'before_removing_obj' and Post.objects.filter(
+            level is TestLevels.BEFORE_DEL_OBJ and Post.objects.filter(
                 pk=self.post.pk
             ).delete()
 
-            level == 'after_removing_obj' and cache.clear()
+            level is TestLevels.AFTER_DEL_OBJ and cache.clear()
 
 
 class FollowingTest(TestCase):
